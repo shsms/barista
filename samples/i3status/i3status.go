@@ -34,9 +34,9 @@ import (
 
 func main() {
 	colors.LoadFromMap(map[string]string{
-		"good":     "#0f0",
-		"bad":      "#f00",
-		"degraded": "#ff0",
+		"good":     "#50FA7B",
+		"bad":      "#FF5555",
+		"degraded": "#F1FA8C",
 	})
 
 	barista.Add(netinfo.New().Output(func(s netinfo.State) bar.Output {
@@ -101,8 +101,10 @@ func main() {
 
 	barista.Add(sysinfo.New().Output(func(i sysinfo.Info) bar.Output {
 		out := outputs.Textf(" 🗠 %.2f ", i.Loads[0])
-		if i.Loads[0] > 5.0 {
+		if i.Loads[0] > 3.0 {
 			out.Color(colors.Scheme("bad"))
+		} else if i.Loads[0] > 2.0 {
+			out.Color(colors.Scheme("degraded"))
 		}
 		return out
 	}))

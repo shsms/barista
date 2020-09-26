@@ -16,7 +16,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"barista.run"
@@ -26,12 +25,11 @@ import (
 	"barista.run/modules/battery"
 	"barista.run/modules/clock"
 	"barista.run/modules/diskspace"
-	"barista.run/modules/meminfo"
 	"barista.run/modules/netinfo"
 	"barista.run/modules/sysinfo"
-	"barista.run/modules/wlan"
+	"barista.run/modules/volume"
+	"barista.run/modules/volume/pulseaudio"
 	"barista.run/outputs"
-	"github.com/martinlindhe/unit"
 )
 
 func main() {
@@ -42,19 +40,14 @@ func main() {
 	})
 
 	barista.Add(netinfo.New().Output(func(s netinfo.State) bar.Output {
-		if !s.Enabled() {
-			return nil
+		if len(s.IPs) < 1 {
+			return outputs.Text("No network").Color(colors.Scheme("bad"))
 		}
-		for _, ip := range s.IPs {
-			if ip.To4() == nil && ip.IsGlobalUnicast() {
-				return outputs.Text(ip.String()).Color(colors.Scheme("good"))
-			}
-		}
-		return outputs.Text("no IPv6").Color(colors.Scheme("bad"))
+		return outputs.Textf("🖧 %v ", s.IPs[0])
 	}))
 
 	barista.Add(diskspace.New("/").Output(func(i diskspace.Info) bar.Output {
-		out := outputs.Text(format.IBytesize(i.Available))
+		out := outputs.Textf(" 🖫 %s ", format.IBytesize(i.Available))
 		switch {
 		case i.AvailFrac() < 0.2:
 			out.Color(colors.Scheme("bad"))
@@ -62,23 +55,6 @@ func main() {
 			out.Color(colors.Scheme("degraded"))
 		}
 		return out
-	}))
-
-	barista.Add(wlan.Any().Output(func(w wlan.Info) bar.Output {
-		switch {
-		case w.Connected():
-			out := fmt.Sprintf("W: (%s)", w.SSID)
-			if len(w.IPs) > 0 {
-				out += fmt.Sprintf(" %s", w.IPs[0])
-			}
-			return outputs.Text(out).Color(colors.Scheme("good"))
-		case w.Connecting():
-			return outputs.Text("W: connecting...").Color(colors.Scheme("degraded"))
-		case w.Enabled():
-			return outputs.Text("W: down").Color(colors.Scheme("bad"))
-		default:
-			return nil
-		}
 	}))
 
 	barista.Add(netinfo.Prefix("e").Output(func(s netinfo.State) bar.Output {
@@ -111,7 +87,7 @@ func main() {
 		if b.Status == battery.Full {
 			return outputs.Text("FULL")
 		}
-		out := outputs.Textf("%s %d%% %s",
+		out := outputs.Textf(" ⏻ %s %d%% %s ",
 			statusName[b.Status],
 			b.RemainingPct(),
 			b.RemainingTime())
@@ -124,32 +100,25 @@ func main() {
 	}))
 
 	barista.Add(sysinfo.New().Output(func(i sysinfo.Info) bar.Output {
-		out := outputs.Textf("%.2f", i.Loads[0])
+		out := outputs.Textf(" 🗠 %.2f ", i.Loads[0])
 		if i.Loads[0] > 5.0 {
 			out.Color(colors.Scheme("bad"))
 		}
 		return out
 	}))
 
-	barista.Add(meminfo.New().Output(func(i meminfo.Info) bar.Output {
-		if i.Available() < unit.Gigabyte {
-			return outputs.Textf(`MEMORY < %s`,
-				format.IBytesize(i.Available())).
-				Color(colors.Scheme("bad"))
+	barista.Add(volume.New(pulseaudio.DefaultSink()).Output(func(v volume.Volume) bar.Output {
+		if v.Mute {
+			return outputs.Text(" 🔇 ")
 		}
-		out := outputs.Textf(`%s/%s`,
-			format.IBytesize(i["MemTotal"]-i.Available()),
-			format.IBytesize(i.Available()))
-		switch {
-		case i.AvailFrac() < 0.2:
-			out.Color(colors.Scheme("bad"))
-		case i.AvailFrac() < 0.33:
-			out.Color(colors.Scheme("degraded"))
+		icon := "🔉"
+		if v.Pct() > 60 {
+			icon = "🔊"
 		}
-		return out
+		return outputs.Textf(" %s %03d ", icon, v.Pct())
 	}))
 
-	barista.Add(clock.Local().OutputFormat("2006-01-02 15:04:05"))
+	barista.Add(clock.Local().OutputFormat(" ⌚ 2006-01-02 15:04:05 "))
 
 	panic(barista.Run())
 }

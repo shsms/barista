@@ -25,7 +25,6 @@ import (
 	"barista.run/modules/battery"
 	"barista.run/modules/clock"
 	"barista.run/modules/diskspace"
-	"barista.run/modules/netinfo"
 	"barista.run/modules/sysinfo"
 	"barista.run/modules/volume"
 	"barista.run/modules/volume/pulseaudio"
@@ -39,15 +38,8 @@ func main() {
 		"degraded": "#F1FA8C",
 	})
 
-	barista.Add(netinfo.New().Output(func(s netinfo.State) bar.Output {
-		if len(s.IPs) < 1 {
-			return outputs.Text("No network").Color(colors.Scheme("bad"))
-		}
-		return outputs.Textf("🖧 %v ", s.IPs[0])
-	}))
-
 	barista.Add(diskspace.New("/").Output(func(i diskspace.Info) bar.Output {
-		out := outputs.Textf(" 🖫 %s ", format.IBytesize(i.Available))
+		out := outputs.Textf(" 💾 %s ", format.IBytesize(i.Available))
 		switch {
 		case i.AvailFrac() < 0.2:
 			out.Color(colors.Scheme("bad"))
@@ -55,23 +47,6 @@ func main() {
 			out.Color(colors.Scheme("degraded"))
 		}
 		return out
-	}))
-
-	barista.Add(netinfo.Prefix("e").Output(func(s netinfo.State) bar.Output {
-		switch {
-		case s.Connected():
-			ip := "<no ip>"
-			if len(s.IPs) > 0 {
-				ip = s.IPs[0].String()
-			}
-			return outputs.Textf("E: %s", ip).Color(colors.Scheme("good"))
-		case s.Connecting():
-			return outputs.Text("E: connecting...").Color(colors.Scheme("degraded"))
-		case s.Enabled():
-			return outputs.Text("E: down").Color(colors.Scheme("bad"))
-		default:
-			return nil
-		}
 	}))
 
 	statusName := map[battery.Status]string{
@@ -85,9 +60,9 @@ func main() {
 			return nil
 		}
 		if b.Status == battery.Full {
-			return outputs.Text("FULL")
+			return outputs.Text(" 🔋 FULL ")
 		}
-		out := outputs.Textf(" ⏻ %s %d%% %s ",
+		out := outputs.Textf(" 🔋 %s %d%% %s ",
 			statusName[b.Status],
 			b.RemainingPct(),
 			b.RemainingTime())
@@ -100,7 +75,7 @@ func main() {
 	}))
 
 	barista.Add(sysinfo.New().Output(func(i sysinfo.Info) bar.Output {
-		out := outputs.Textf(" 🗠 %.2f ", i.Loads[0])
+		out := outputs.Textf(" 📈 %.2f ", i.Loads[0])
 		if i.Loads[0] > 3.0 {
 			out.Color(colors.Scheme("bad"))
 		} else if i.Loads[0] > 2.0 {
